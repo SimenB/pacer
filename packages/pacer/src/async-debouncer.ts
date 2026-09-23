@@ -341,10 +341,14 @@ export class AsyncDebouncer<TFn extends AnyAsyncFunction> {
         this.#resolvePreviousPromise = resolve
         // this.#rejectPreviousPromise = reject
         this.#timeoutId = setTimeout(async () => {
+          // A call made during this execution must not resolve this promise early
+          this.#resolvePreviousPromise = null
+          let result = this.store.state.lastResult
+
           // Execute trailing if enabled
           if (this.options.trailing && this.store.state.lastArgs) {
             try {
-              await this.#execute(...this.store.state.lastArgs)
+              result = await this.#execute(...this.store.state.lastArgs)
             } catch (error) {
               reject(error)
             }
@@ -352,8 +356,7 @@ export class AsyncDebouncer<TFn extends AnyAsyncFunction> {
 
           // Reset state and resolve
           this.#setState({ canLeadingExecute: true })
-          this.#resolvePreviousPromise = null
-          resolve(this.store.state.lastResult)
+          resolve(result)
         }, this.#getWait())
       },
     )
@@ -364,6 +367,7 @@ export class AsyncDebouncer<TFn extends AnyAsyncFunction> {
   ): Promise<Awaited<ReturnType<TFn>> | undefined> => {
     if (!this.#getEnabled()) return undefined
     const currentMaybeExecuteCount = this.store.state.maybeExecuteCount + 1
+    const maybeExecuteCountAtStart = this.store.state.maybeExecuteCount
 
     try {
       this.#setState({ isExecuting: true })
@@ -389,11 +393,13 @@ export class AsyncDebouncer<TFn extends AnyAsyncFunction> {
     } finally {
       this.asyncRetryers.delete(currentMaybeExecuteCount) // dispose retryer
       this.#setState({
-        isExecuting: false,
-        isPending: false,
-        lastArgs: undefined,
+        isExecuting: this.asyncRetryers.size > 0,
         settleCount: this.store.state.settleCount + 1,
       })
+      // A newer call made during this execution owns lastArgs and isPending
+      if (this.store.state.maybeExecuteCount === maybeExecuteCountAtStart) {
+        this.#setState({ isPending: false, lastArgs: undefined })
+      }
       this.options.onSettled?.(args, this)
     }
     return this.store.state.lastResult
