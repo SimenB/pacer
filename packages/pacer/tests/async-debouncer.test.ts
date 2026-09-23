@@ -1367,6 +1367,21 @@ describe('asyncDebounce helper function', () => {
       expect(typeof debouncer.getAbortSignal).toBe('function')
       expect(debouncer.getAbortSignal()).toBeNull()
     })
+
+    it('should return the signal of the current execution', async () => {
+      let signal: AbortSignal | null = null
+      const debouncer = new AsyncDebouncer(
+        async () => {
+          signal = debouncer.getAbortSignal()
+        },
+        { wait: 300 },
+      )
+
+      debouncer.maybeExecute()
+      await vi.advanceTimersByTimeAsync(300)
+
+      expect(signal).toBeInstanceOf(AbortSignal)
+    })
   })
 })
 
