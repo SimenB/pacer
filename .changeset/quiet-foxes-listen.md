@@ -2,4 +2,4 @@
 '@tanstack/pacer': patch
 ---
 
-fix(async-debouncer): return the current execution's signal from `getAbortSignal()` instead of `null`
+fix(async-debouncer, async-throttler): return the running execution's signal from `getAbortSignal()` instead of `null`

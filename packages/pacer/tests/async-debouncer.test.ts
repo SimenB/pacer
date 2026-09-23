@@ -1382,6 +1382,27 @@ describe('asyncDebounce helper function', () => {
 
       expect(signal).toBeInstanceOf(AbortSignal)
     })
+
+    it('should return the signal of the running execution while a newer call waits', async () => {
+      const signals: Array<AbortSignal | null> = []
+      const debouncer = new AsyncDebouncer(
+        async () => {
+          signals.push(debouncer.getAbortSignal())
+          await new Promise((resolve) => setTimeout(resolve, 100))
+          signals.push(debouncer.getAbortSignal())
+        },
+        { wait: 50 },
+      )
+
+      debouncer.maybeExecute() // runs 50-150ms
+      await vi.advanceTimersByTimeAsync(140)
+      debouncer.maybeExecute() // runs 190-290ms
+      await vi.advanceTimersByTimeAsync(20)
+
+      expect(signals).toHaveLength(2)
+      expect(signals[0]).toBeInstanceOf(AbortSignal)
+      expect(signals[1]).toBe(signals[0])
+    })
   })
 })
 
