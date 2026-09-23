@@ -345,6 +345,25 @@ describe('AsyncThrottler', () => {
     expect(throttler.store.state.isExecuting).toBe(false)
   })
 
+  it('should not be pending while the trailing execution runs', async () => {
+    const mockFn = vi.fn(async (n: number) => {
+      await new Promise((resolve) => setTimeout(resolve, 100))
+      return n
+    })
+    const throttler = new AsyncThrottler(mockFn, { wait: 50 })
+
+    throttler.maybeExecute(1) // leading, runs 0-100ms
+    await vi.advanceTimersByTimeAsync(120)
+    throttler.maybeExecute(2) // trailing, runs 150-250ms
+    await vi.advanceTimersByTimeAsync(40)
+    expect(throttler.store.state.isPending).toBe(false)
+    expect(throttler.store.state.status).toBe('executing')
+
+    await expect(throttler.flush()).resolves.toBeUndefined()
+    await vi.advanceTimersByTimeAsync(300)
+    expect(mockFn.mock.calls).toEqual([[1], [2]])
+  })
+
   it('should cancel pending calls when cancel is called', async () => {
     const mockFn = vi.fn().mockResolvedValue(undefined)
     const throttler = new AsyncThrottler(mockFn, { wait: 100 })

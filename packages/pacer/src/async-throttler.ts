@@ -392,6 +392,7 @@ export class AsyncThrottler<TFn extends AnyAsyncFunction> {
             this.#clearTimeout()
             // A call made during this execution must not resolve this promise early
             this.#resolvePreviousPromise = null
+            this.#setState({ isPending: false })
             let result = this.store.state.lastResult
             if (this.store.state.lastArgs !== undefined) {
               try {
